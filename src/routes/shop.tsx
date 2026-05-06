@@ -37,7 +37,7 @@ function Shop() {
   }, [params]);
 
   const update = (patch: Partial<typeof params>) =>
-    navigate({ search: (prev) => ({ ...prev, ...patch }) as never });
+    navigate({ search: (prev: typeof params) => ({ ...prev, ...patch }) as never });
 
   return (
     <div>
