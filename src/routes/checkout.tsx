@@ -238,6 +238,9 @@ function Checkout() {
           >
             {submitting ? "Processing…" : `Pay $${total}`}
           </button>
+          {submitError && (
+            <p className="mt-3 text-center text-xs text-destructive">{submitError}</p>
+          )}
           <p className="mt-3 text-center text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
             🔒 Secure HTTPS · Demo checkout
           </p>
