@@ -33,12 +33,15 @@ export type CheckoutForm = z.infer<typeof schema>;
 function Checkout() {
   const navigate = useNavigate();
   const { items, subtotal, clear } = useCart();
+  const { user } = useAuth();
+  const createOrderFn = useServerFn(createOrder);
   const [form, setForm] = useState<CheckoutForm>({
-    fullName: "", email: "", phone: "", address: "", city: "", zip: "", country: "",
+    fullName: "", email: user?.email ?? "", phone: "", address: "", city: "", zip: "", country: "",
     notes: "", payment: "card",
   });
   const [errors, setErrors] = useState<Partial<Record<keyof CheckoutForm, string>>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   const ship = subtotal() >= 200 ? 0 : 12;
   const total = subtotal() + ship;
@@ -54,7 +57,7 @@ function Checkout() {
     );
   }
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const result = schema.safeParse(form);
     if (!result.success) {
@@ -68,17 +71,41 @@ function Checkout() {
     }
     setErrors({});
     setSubmitting(true);
-    const orderId = "ATL-" + Math.random().toString(36).slice(2, 8).toUpperCase();
-    const summary = {
-      orderId, total,
-      items: items.map((i) => ({ name: i.product.name, qty: i.quantity, size: i.size, price: i.product.price })),
-      ...result.data,
-    };
-    sessionStorage.setItem("last-order", JSON.stringify(summary));
-    setTimeout(() => {
+    setSubmitError("");
+    try {
+      const order = await createOrderFn({
+        data: {
+          email: result.data.email,
+          fullName: result.data.fullName,
+          phone: result.data.phone,
+          address: result.data.address,
+          city: result.data.city,
+          zip: result.data.zip,
+          country: result.data.country,
+          notes: result.data.notes,
+          totalCents: Math.round(total * 100),
+          userId: user?.id ?? null,
+          items: items.map((i) => ({
+            productId: i.product.id,
+            name: i.product.name,
+            size: i.size,
+            quantity: i.quantity,
+            price: i.product.price,
+          })),
+        },
+      });
+      const summary = {
+        orderId: order.orderId, total,
+        items: items.map((i) => ({ name: i.product.name, qty: i.quantity, size: i.size, price: i.product.price })),
+        ...result.data,
+      };
+      sessionStorage.setItem("last-order", JSON.stringify(summary));
       clear();
       navigate({ to: "/thank-you" });
-    }, 800);
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "Could not place order");
+      setSubmitting(false);
+    }
   };
 
   const field = (key: keyof CheckoutForm, label: string, type = "text") => (
