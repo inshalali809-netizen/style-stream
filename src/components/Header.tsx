@@ -1,13 +1,15 @@
 import { Link } from "@tanstack/react-router";
-import { ShoppingBag, Search, Menu, X } from "lucide-react";
+import { ShoppingBag, Search, Menu, X, User } from "lucide-react";
 import { useState } from "react";
 import { useCart } from "@/store/cart";
 import { CartDrawer } from "./CartDrawer";
+import { useAuth } from "@/hooks/useAuth";
 
 export function Header() {
   const count = useCart((s) => s.items.reduce((n, i) => n + i.quantity, 0));
   const toggle = useCart((s) => s.toggle);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { user } = useAuth();
 
   const links = [
     { to: "/shop", label: "Shop" },
@@ -73,6 +75,13 @@ export function Header() {
             <button aria-label="Search" className="hidden md:block">
               <Search className="h-5 w-5" />
             </button>
+            <Link
+              to={user ? "/account" : "/login"}
+              aria-label={user ? "Account" : "Sign in"}
+              className="hidden md:block"
+            >
+              <User className="h-5 w-5" />
+            </Link>
             <button
               aria-label="Cart"
               onClick={() => toggle(true)}
