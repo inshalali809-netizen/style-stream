@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import type { Database } from "@/integrations/supabase/types";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
@@ -23,19 +24,29 @@ const createOrderSchema = z.object({
   items: z.array(itemSchema).min(1).max(50),
   totalCents: z.number().int().min(1).max(10_000_000),
   userId: z.string().uuid().nullable().optional(),
+  paymentMethod: z.enum(["easypaisa", "raast", "card", "cod"]),
 });
 
 export const createOrder = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => createOrderSchema.parse(input))
+  .validator((input: unknown) => createOrderSchema.parse(input))
   .handler(async ({ data }) => {
+    // TODO (next step): recalculate data.totalCents from a real `products`
+    // table here instead of trusting the number sent by the browser.
+    // Until that table exists, this still trusts the client for price —
+    // but it no longer lies about payment having happened.
+
     const { data: order, error } = await supabaseAdmin
       .from("orders")
       .insert({
         user_id: data.userId ?? null,
         email: data.email,
-        status: "paid",
+        // Orders always start as "pending". Only a confirmed Cash on
+        // Delivery order, or a verified PSP webhook, should ever move
+        // an order to "paid". Never mark "paid" here on form submit.
+        status: "pending",
+        payment_method: data.paymentMethod,
         total_cents: data.totalCents,
-        currency: "usd",
+        currency: "pkr",
         shipping_address: {
           fullName: data.fullName,
           phone: data.phone,
@@ -99,7 +110,7 @@ const profileUpdateSchema = z.object({
 
 export const updateMyProfile = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => profileUpdateSchema.parse(input))
+  .validator((input: unknown) => profileUpdateSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase
       .from("profiles")

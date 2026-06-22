@@ -4,7 +4,8 @@ import { useState } from "react";
 import { z } from "zod";
 import { useCart } from "@/store/cart";
 import { useAuth } from "@/hooks/useAuth";
-import { createOrder } from "@/server/orders.functions";
+import { createOrder } from "@/api/orders.functions";
+import { formatPKR } from "@/lib/currency";
 
 export const Route = createFileRoute("/checkout")({
   head: () => ({
@@ -25,7 +26,7 @@ const schema = z.object({
   zip: z.string().trim().min(2, "Required").max(20),
   country: z.string().trim().min(2, "Required").max(80),
   notes: z.string().max(500).optional(),
-  payment: z.enum(["card", "paypal", "applepay", "googlepay"]),
+  payment: z.enum(["easypaisa", "raast", "card", "cod"]),
 });
 
 export type CheckoutForm = z.infer<typeof schema>;
@@ -37,7 +38,7 @@ function Checkout() {
   const createOrderFn = useServerFn(createOrder);
   const [form, setForm] = useState<CheckoutForm>({
     fullName: "", email: user?.email ?? "", phone: "", address: "", city: "", zip: "", country: "",
-    notes: "", payment: "card",
+    notes: "", payment: "cod",
   });
   const [errors, setErrors] = useState<Partial<Record<keyof CheckoutForm, string>>>({});
   const [submitting, setSubmitting] = useState(false);
@@ -85,6 +86,7 @@ function Checkout() {
           notes: result.data.notes,
           totalCents: Math.round(total * 100),
           userId: user?.id ?? null,
+          paymentMethod: result.data.payment,
           items: items.map((i) => ({
             productId: i.product.id,
             name: i.product.name,
@@ -161,14 +163,14 @@ function Checkout() {
           <section>
             <h2 className="font-display text-2xl tracking-widest">PAYMENT</h2>
             <p className="mt-2 text-xs uppercase tracking-[0.25em] text-muted-foreground">
-              Encrypted · PCI-compliant gateway
+              Choose how you'd like to pay
             </p>
             <div className="mt-6 grid gap-3 md:grid-cols-2">
               {[
-                { id: "card", label: "Card · Visa / Mastercard / Amex" },
-                { id: "paypal", label: "PayPal" },
-                { id: "applepay", label: "Apple Pay" },
-                { id: "googlepay", label: "Google Pay" },
+                { id: "cod", label: "Cash on Delivery" },
+                { id: "easypaisa", label: "Easypaisa" },
+                { id: "raast", label: "Raast" },
+                { id: "card", label: "Debit / Credit Card" },
               ].map((p) => (
                 <label
                   key={p.id}
@@ -187,23 +189,15 @@ function Checkout() {
                 </label>
               ))}
             </div>
-            {form.payment === "card" && (
-              <div className="mt-6 grid gap-6 md:grid-cols-3">
-                <div className="md:col-span-3">
-                  <label className="flex flex-col gap-1.5">
-                    <span className="text-xs uppercase tracking-[0.25em] text-muted-foreground">Card number</span>
-                    <input placeholder="•••• •••• •••• ••••" className="border-b border-border bg-transparent py-2 text-sm focus:border-foreground focus:outline-none" />
-                  </label>
-                </div>
-                <label className="flex flex-col gap-1.5 md:col-span-2">
-                  <span className="text-xs uppercase tracking-[0.25em] text-muted-foreground">Expiry</span>
-                  <input placeholder="MM / YY" className="border-b border-border bg-transparent py-2 text-sm focus:border-foreground focus:outline-none" />
-                </label>
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-xs uppercase tracking-[0.25em] text-muted-foreground">CVC</span>
-                  <input placeholder="•••" className="border-b border-border bg-transparent py-2 text-sm focus:border-foreground focus:outline-none" />
-                </label>
-              </div>
+            {form.payment === "cod" ? (
+              <p className="mt-4 text-xs text-muted-foreground">
+                Pay in cash when your order arrives. We'll confirm your order by phone or email.
+              </p>
+            ) : (
+              <p className="mt-4 text-xs text-muted-foreground">
+                Online payment for this method is coming soon. For now your order will be placed
+                as pending and our team will contact you to arrange payment.
+              </p>
             )}
           </section>
         </div>
@@ -220,29 +214,29 @@ function Checkout() {
                   <p className="font-medium">{i.product.name}</p>
                   <p className="text-muted-foreground">{i.size} · ×{i.quantity}</p>
                 </div>
-                <p className="text-xs">${i.product.price * i.quantity}</p>
+                <p className="text-xs">{formatPKR(i.product.price * i.quantity)}</p>
               </li>
             ))}
           </ul>
           <dl className="mt-4 space-y-2 border-t border-border pt-4 text-sm">
-            <div className="flex justify-between"><dt>Subtotal</dt><dd>${subtotal()}</dd></div>
-            <div className="flex justify-between text-muted-foreground"><dt>Shipping</dt><dd>{ship === 0 ? "Free" : `$${ship}`}</dd></div>
+            <div className="flex justify-between"><dt>Subtotal</dt><dd>{formatPKR(subtotal())}</dd></div>
+            <div className="flex justify-between text-muted-foreground"><dt>Shipping</dt><dd>{ship === 0 ? "Free" : formatPKR(ship)}</dd></div>
           </dl>
           <div className="mt-3 flex justify-between border-t border-border pt-4 text-base font-medium">
-            <span>Total</span><span>${total}</span>
+            <span>Total</span><span>{formatPKR(total)}</span>
           </div>
           <button
             type="submit"
             disabled={submitting}
             className="mt-6 block w-full bg-primary py-4 text-center text-xs uppercase tracking-[0.3em] text-primary-foreground transition hover:bg-primary/90 disabled:opacity-60"
           >
-            {submitting ? "Processing…" : `Pay $${total}`}
+            {submitting ? "Processing…" : `Pay ${formatPKR(total)}`}
           </button>
           {submitError && (
             <p className="mt-3 text-center text-xs text-destructive">{submitError}</p>
           )}
           <p className="mt-3 text-center text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-            🔒 Secure HTTPS · Demo checkout
+            🔒 Secure HTTPS
           </p>
         </aside>
       </form>

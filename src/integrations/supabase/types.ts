@@ -21,10 +21,11 @@ export type Database = {
           email: string
           id: string
           items: Json
+          payment_method: Database["public"]["Enums"]["payment_method"]
+          psp_name: string | null
+          psp_reference: string | null
           shipping_address: Json | null
           status: Database["public"]["Enums"]["order_status"]
-          stripe_payment_intent: string | null
-          stripe_session_id: string | null
           total_cents: number
           updated_at: string
           user_id: string | null
@@ -35,10 +36,11 @@ export type Database = {
           email: string
           id?: string
           items: Json
+          payment_method?: Database["public"]["Enums"]["payment_method"]
+          psp_name?: string | null
+          psp_reference?: string | null
           shipping_address?: Json | null
           status?: Database["public"]["Enums"]["order_status"]
-          stripe_payment_intent?: string | null
-          stripe_session_id?: string | null
           total_cents: number
           updated_at?: string
           user_id?: string | null
@@ -49,13 +51,56 @@ export type Database = {
           email?: string
           id?: string
           items?: Json
+          payment_method?: Database["public"]["Enums"]["payment_method"]
+          psp_name?: string | null
+          psp_reference?: string | null
           shipping_address?: Json | null
           status?: Database["public"]["Enums"]["order_status"]
-          stripe_payment_intent?: string | null
-          stripe_session_id?: string | null
           total_cents?: number
           updated_at?: string
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      products: {
+        Row: {
+          active: boolean
+          bestseller: boolean
+          category: string
+          color: string
+          created_at: string
+          description: string
+          id: string
+          image_url: string | null
+          name: string
+          price: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          bestseller?: boolean
+          category: string
+          color: string
+          created_at?: string
+          description: string
+          id: string
+          image_url?: string | null
+          name: string
+          price: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          bestseller?: boolean
+          category?: string
+          color?: string
+          created_at?: string
+          description?: string
+          id?: string
+          image_url?: string | null
+          name?: string
+          price?: number
+          updated_at?: string
         }
         Relationships: []
       }
@@ -104,6 +149,7 @@ export type Database = {
     }
     Enums: {
       order_status: "pending" | "paid" | "fulfilled" | "cancelled" | "refunded"
+      payment_method: "easypaisa" | "raast" | "card" | "cod"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -232,6 +278,7 @@ export const Constants = {
   public: {
     Enums: {
       order_status: ["pending", "paid", "fulfilled", "cancelled", "refunded"],
+      payment_method: ["easypaisa", "raast", "card", "cod"],
     },
   },
 } as const

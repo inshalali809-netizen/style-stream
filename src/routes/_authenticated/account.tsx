@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { getMyOrders, getMyProfile, updateMyProfile } from "@/server/orders.functions";
+import { getMyOrders, getMyProfile, updateMyProfile } from "@/api/orders.functions";
 import { categories } from "@/data/products";
 
 export const Route = createFileRoute("/_authenticated/account")({
