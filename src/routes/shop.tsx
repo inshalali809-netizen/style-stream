@@ -1,8 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
-import { products, categories, colors, type Category, type Color } from "@/data/products";
+import { getProducts, type DbProduct } from "@/actions/products";
 import { ProductCard } from "@/components/ProductCard";
+import { categories, colors, type Category, type Color } from "@/data/products";
 
 const search = z.object({
   category: z.enum(["Outerwear", "Tops", "Bottoms", "Dresses"]).optional(),
@@ -26,15 +28,26 @@ function Shop() {
   const navigate = useNavigate({ from: "/shop" });
   const params = Route.useSearch();
   const [openFilters, setOpenFilters] = useState(false);
+  const [allProducts, setAllProducts] = useState<DbProduct[]>([]);
+  const [loading, setLoading] = useState(true);
+  const getProductsFn = useServerFn(getProducts);
+
+  useEffect(() => {
+    setLoading(true);
+    getProductsFn({ data: {} })
+      .then((res) => setAllProducts(res.products))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
 
   const filtered = useMemo(() => {
-    let list = products.slice();
+    let list = allProducts.slice();
     if (params.category) list = list.filter((p) => p.category === params.category);
     if (params.color) list = list.filter((p) => p.color === params.color);
     if (params.sort === "low") list.sort((a, b) => a.price - b.price);
     if (params.sort === "high") list.sort((a, b) => b.price - a.price);
     return list;
-  }, [params]);
+  }, [allProducts, params]);
 
   const update = (patch: Partial<typeof params>) =>
     navigate({ search: (prev: typeof params) => ({ ...prev, ...patch }) as never });
@@ -44,7 +57,7 @@ function Shop() {
       <section className="border-b border-border">
         <div className="mx-auto max-w-[1500px] px-5 py-16 md:px-10 md:py-24">
           <p className="text-xs uppercase tracking-[0.4em] text-muted-foreground">
-            The Collection · {filtered.length} pieces
+            The Collection · {loading ? "…" : `${filtered.length} pieces`}
           </p>
           <h1 className="mt-4 font-display text-6xl tracking-wide md:text-8xl">
             {params.category ?? "All garments"}
@@ -106,12 +119,21 @@ function Shop() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-6 md:grid-cols-3 md:gap-8 lg:grid-cols-4">
-          {filtered.map((p, i) => (
-            <ProductCard key={p.id} product={p} index={i} />
-          ))}
-        </div>
-        {filtered.length === 0 && (
+        {loading ? (
+          <div className="grid grid-cols-2 gap-6 md:grid-cols-3 md:gap-8 lg:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="aspect-[3/4] animate-pulse bg-muted" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-6 md:grid-cols-3 md:gap-8 lg:grid-cols-4">
+            {filtered.map((p, i) => (
+              <ProductCard key={p.id} product={p} index={i} />
+            ))}
+          </div>
+        )}
+
+        {!loading && filtered.length === 0 && (
           <p className="py-24 text-center text-sm uppercase tracking-[0.3em] text-muted-foreground">
             No pieces match. Adjust your filters.
           </p>

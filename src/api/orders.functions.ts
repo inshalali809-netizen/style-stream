@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import type { Database } from "@/integrations/supabase/types";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
@@ -30,22 +29,47 @@ const createOrderSchema = z.object({
 export const createOrder = createServerFn({ method: "POST" })
   .validator((input: unknown) => createOrderSchema.parse(input))
   .handler(async ({ data }) => {
-    // TODO (next step): recalculate data.totalCents from a real `products`
-    // table here instead of trusting the number sent by the browser.
-    // Until that table exists, this still trusts the client for price —
-    // but it no longer lies about payment having happened.
+    const productIds = data.items.map((i) => i.productId);
+    const { data: dbProducts, error: productError } = await supabaseAdmin
+      .from("products")
+      .select("id, price, active")
+      .in("id", productIds);
+
+    if (productError || !dbProducts) {
+      console.error("createOrder: failed to fetch products", productError);
+      throw new Error("Could not verify product prices");
+    }
+
+    const priceMap = new Map(dbProducts.map((p) => [p.id, p]));
+    for (const item of data.items) {
+      const product = priceMap.get(item.productId);
+      if (!product) throw new Error(`Product not found: ${item.productId}`);
+      if (!product.active) throw new Error(`Product unavailable: ${item.productId}`);
+    }
+
+    const subtotal = data.items.reduce((sum, item) => {
+      const product = priceMap.get(item.productId)!;
+      return sum + product.price * item.quantity;
+    }, 0);
+    const shipping = subtotal >= 200 ? 0 : 12;
+    const realTotalCents = Math.round((subtotal + shipping) * 100);
+
+    const verifiedItems = data.items.map((item) => ({
+      productId: item.productId,
+      name: item.name,
+      size: item.size,
+      quantity: item.quantity,
+      price: priceMap.get(item.productId)!.price,
+    }));
 
     const { data: order, error } = await supabaseAdmin
       .from("orders")
       .insert({
         user_id: data.userId ?? null,
         email: data.email,
-        // Orders always start as "pending". Only a confirmed Cash on
-        // Delivery order, or a verified PSP webhook, should ever move
-        // an order to "paid". Never mark "paid" here on form submit.
         status: "pending",
         payment_method: data.paymentMethod,
-        total_cents: data.totalCents,
+        total_cents: realTotalCents,
         currency: "pkr",
         shipping_address: {
           fullName: data.fullName,
@@ -56,7 +80,7 @@ export const createOrder = createServerFn({ method: "POST" })
           country: data.country,
           notes: data.notes,
         },
-        items: data.items,
+        items: verifiedItems,
       })
       .select("id")
       .single();
@@ -66,7 +90,7 @@ export const createOrder = createServerFn({ method: "POST" })
       throw new Error("Could not create order");
     }
     const orderId = "ATL-" + order.id.slice(0, 6).toUpperCase();
-    return { id: order.id, orderId };
+    return { id: order.id, orderId, totalCents: realTotalCents };
   });
 
 export const getMyOrders = createServerFn({ method: "GET" })
@@ -116,6 +140,50 @@ export const updateMyProfile = createServerFn({ method: "POST" })
       .from("profiles")
       .update(data)
       .eq("id", context.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ─── Admin functions ──────────────────────────────────────────────────────────
+
+async function assertAdmin(userId: string): Promise<void> {
+  const { data, error } = await supabaseAdmin
+    .from("profiles")
+    .select("is_admin")
+    .eq("id", userId)
+    .single();
+  if (error || !data?.is_admin) {
+    throw new Response("Forbidden", { status: 403 });
+  }
+}
+
+const updateOrderStatusSchema = z.object({
+  orderId: z.string().uuid(),
+  status: z.enum(["pending", "paid", "fulfilled", "cancelled", "refunded"]),
+});
+
+export const getAdminOrders = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context.userId);
+    const { data, error } = await supabaseAdmin
+      .from("orders")
+      .select("id, created_at, email, status, payment_method, total_cents, currency, items, shipping_address")
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error) throw new Error(error.message);
+    return { orders: data ?? [] };
+  });
+
+export const updateOrderStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: unknown) => updateOrderStatusSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context.userId);
+    const { error } = await supabaseAdmin
+      .from("orders")
+      .update({ status: data.status })
+      .eq("id", data.orderId);
     if (error) throw new Error(error.message);
     return { ok: true };
   });

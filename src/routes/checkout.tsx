@@ -208,7 +208,7 @@ function Checkout() {
             {items.map((i) => (
               <li key={`${i.product.id}-${i.size}`} className="flex gap-3 py-3">
                 <div className="h-16 w-12 shrink-0 overflow-hidden bg-muted">
-                  <img src={i.product.image} alt={i.product.name} className="h-full w-full object-cover" />
+                  <img src={i.product.image_url ?? ""} alt={i.product.name} className="h-full w-full object-cover" />
                 </div>
                 <div className="flex-1 text-xs">
                   <p className="font-medium">{i.product.name}</p>

@@ -1,9 +1,10 @@
 import { Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import type { Product } from "@/data/products";
+import type { DbProduct } from "@/actions/products";
 import { useCart } from "@/store/cart";
+import { formatPKR } from "@/lib/currency";
 
-export function ProductCard({ product, index = 0 }: { product: Product; index?: number }) {
+export function ProductCard({ product, index = 0 }: { product: DbProduct; index?: number }) {
   const add = useCart((s) => s.add);
   return (
     <motion.div
@@ -16,7 +17,7 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
       <Link to="/shop" className="block">
         <div className="relative aspect-[3/4] overflow-hidden bg-muted">
           <img
-            src={product.image}
+            src={product.image_url ?? ""}
             alt={product.name}
             loading="lazy"
             className="img-zoom absolute inset-0 h-full w-full object-cover"
@@ -39,7 +40,7 @@ export function ProductCard({ product, index = 0 }: { product: Product; index?: 
             {product.color}
           </p>
         </div>
-        <p className="text-sm">${product.price}</p>
+        <p className="text-sm">{formatPKR(product.price)}</p>
       </div>
     </motion.div>
   );

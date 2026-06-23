@@ -1,9 +1,9 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Product } from "@/data/products";
+import type { DbProduct } from "@/actions/products";
 
 export interface CartItem {
-  product: Product;
+  product: DbProduct;
   quantity: number;
   size: string;
 }
@@ -11,7 +11,7 @@ export interface CartItem {
 interface CartState {
   items: CartItem[];
   isOpen: boolean;
-  add: (product: Product, size?: string) => void;
+  add: (product: DbProduct, size?: string) => void;
   remove: (id: string, size: string) => void;
   setQty: (id: string, size: string, qty: number) => void;
   clear: () => void;
